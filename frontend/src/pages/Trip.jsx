@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Loader2, Package, Star } from "lucide-react";
 import { toast } from "sonner";
@@ -11,7 +11,7 @@ import { Directions, DriverCard, OtpCard, PayOnline, RateCard, Steps } from "@/c
 
 const ACTIVE = ["searching", "accepted", "arrived", "ongoing"];
 
-function DriverActions({ b, act, busy }) {
+function DriverActions({ b, act, busy, onRelease }) {
   const [otp, setOtp] = useState("");
   const btn = "press flex h-14 w-full items-center justify-center gap-2 rounded-2xl text-base font-bold disabled:opacity-50";
   return (
@@ -28,6 +28,10 @@ function DriverActions({ b, act, busy }) {
             placeholder="Customer OTP" className="h-14 min-w-0 flex-1 rounded-2xl border bg-background px-4 text-center font-mono text-xl tracking-[0.4em] outline-none" />
           <button data-testid="driver-start-trip" disabled={otp.length !== 4 || busy} onClick={() => act("start", { otp })} className={`${btn} w-auto bg-go px-6 text-white`}>Start</button>
         </div>
+      )}
+      {["accepted", "arrived"].includes(b.status) && (
+        <button data-testid="driver-release-trip" disabled={busy} onClick={() => window.confirm("Release this trip? It will be offered to another driver.") && onRelease()}
+          className="press h-11 w-full rounded-2xl border border-red-200 text-sm font-semibold text-red-700">Can't make it — release trip</button>
       )}
       {b.status === "ongoing" && (
         <button data-testid="driver-complete-trip" disabled={busy} onClick={() => act("complete")} className={`${btn} bg-primary text-primary-foreground`}>
@@ -61,6 +65,7 @@ export default function Trip() {
   const api = useApi();
   const qc = useQueryClient();
   const { data: me } = useMe();
+  const navigate = useNavigate();
   const { data: b, isLoading, isError, error } = useQuery({
     queryKey: ["booking", id],
     queryFn: async () => (await api.get(`/bookings/${id}`)).data,
@@ -79,6 +84,10 @@ export default function Trip() {
   const isCustomer = me?.user_id === b.customer_id;
   const isDriver = me?.user_id === b.driver_id;
   const act = (a, body) => mutate.mutate({ path: `/driver/bookings/${b.id}/${a}`, body });
+  const release = async () => {
+    try { await api.post(`/driver/bookings/${b.id}/release`); qc.invalidateQueries({ queryKey: ["driver-active"] }); navigate("/"); toast.success("Trip released"); }
+    catch (e) { toast.error(errMsg(e)); }
+  };
 
   return (
     <div className="mx-auto grid max-w-5xl gap-5 lg:grid-cols-2">
@@ -92,6 +101,7 @@ export default function Trip() {
           <StatusBadge status={b.status} testId="trip-status" />
         </div>
         {b.status !== "cancelled" && <Steps status={b.status} />}
+        {b.status === "cancelled" && b.cancel_reason && <p data-testid="cancel-reason" className="rounded-2xl bg-red-50 p-4 text-sm text-red-800">{b.cancel_reason}. Please try booking again.</p>}
         {b.status === "searching" && (
           <div data-testid="searching-card" className="flex items-center gap-4 rounded-2xl bg-brand p-4" >
             <span className="relative flex h-4 w-4"><span className="pulse-ring absolute inset-0 rounded-full bg-foreground" /><span className="relative h-4 w-4 rounded-full bg-foreground" /></span>
@@ -100,7 +110,7 @@ export default function Trip() {
         )}
         {isCustomer && ["accepted", "arrived"].includes(b.status) && <OtpCard otp={b.otp} />}
         {!isDriver && <DriverCard driver={b.driver} />}
-        {isDriver && ACTIVE.includes(b.status) && <DriverActions b={b} act={act} busy={mutate.isPending} />}
+        {isDriver && ACTIVE.includes(b.status) && <DriverActions b={b} act={act} busy={mutate.isPending} onRelease={release} />}
         <Summary b={b} />
         {isCustomer && b.status === "completed" && b.payment_method === "online" && b.payment_status === "pending" && <PayOnline booking={b} api={api} onPaid={refresh} />}
         {isCustomer && b.status === "completed" && !b.rating && (

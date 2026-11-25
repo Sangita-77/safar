@@ -307,6 +307,7 @@ def view_booking(b: dict, viewer: dict) -> dict:
 
 @api.post("/bookings")
 async def create_booking(body: BookingIn, member: dict = Depends(current_member)):
+    await expire_stale()
     if await db.bookings.find_one({"customer_id": member["user_id"], "status": {"$in": ACTIVE}}, {"_id": 0, "id": 1}):
         raise HTTPException(409, "You already have an active booking")
     fare = await db.fares.find_one({"key": body.fare_key, "service": body.service, "active": True}, {"_id": 0})
@@ -333,6 +334,13 @@ async def create_booking(body: BookingIn, member: dict = Depends(current_member)
     return view_booking(doc, member)
 
 
+async def expire_stale():
+    cutoff = (datetime.now(timezone.utc) - timedelta(minutes=30)).isoformat()
+    await db.bookings.update_many({"status": "searching", "created_at": {"$lt": cutoff}},
+                                  {"$set": {"status": "cancelled", "cancelled_by": "system",
+                                            "cancel_reason": "No driver was available", "updated_at": now_iso()}})
+
+
 @api.get("/bookings")
 async def my_bookings(member: dict = Depends(current_member)):
     rows = await db.bookings.find({"customer_id": member["user_id"]}, {"_id": 0}).sort("created_at", -1).to_list(200)
@@ -341,12 +349,14 @@ async def my_bookings(member: dict = Depends(current_member)):
 
 @api.get("/bookings/active")
 async def my_active_booking(member: dict = Depends(current_member)):
+    await expire_stale()
     b = await db.bookings.find_one({"customer_id": member["user_id"], "status": {"$in": ACTIVE}}, {"_id": 0})
     return view_booking(b, member) if b else None
 
 
 @api.get("/bookings/{bid}")
 async def get_booking(bid: str, member: dict = Depends(current_member)):
+    await expire_stale()
     scope = {}
     if member["role"] != "admin":
         scope = {"$or": [{"customer_id": member["user_id"]}, {"driver_id": member["user_id"]}]}
@@ -450,8 +460,8 @@ async def driver_requests(drv: dict = Depends(current_driver)):
     d = drv["driver"]
     if not d.get("online"):
         return []
-    cutoff = (datetime.now(timezone.utc) - timedelta(minutes=30)).isoformat()
-    rows = await db.bookings.find({"status": "searching", "vehicle": d["vehicle_type"], "created_at": {"$gte": cutoff}},
+    await expire_stale()
+    rows = await db.bookings.find({"status": "searching", "vehicle": d["vehicle_type"]},
                                   {"_id": 0, "otp": 0, "razorpay_order_id": 0}).sort("created_at", -1).to_list(50)
     loc = d.get("location")
     for r in rows:
@@ -508,10 +518,22 @@ async def driver_start(bid: str, body: OtpIn, drv: dict = Depends(current_driver
     b = await db.bookings.find_one({"id": bid, "driver_id": drv["user_id"], "status": {"$in": ["accepted", "arrived"]}}, {"_id": 0})
     if not b:
         raise HTTPException(409, "This action is not possible right now")
+    if b.get("otp_attempts", 0) >= 5:
+        raise HTTPException(429, "Too many wrong OTP attempts. Release this trip or ask the customer to rebook.")
     if not hmac.compare_digest(b["otp"], body.otp):
-        raise HTTPException(400, "Incorrect OTP")
+        await db.bookings.update_one({"id": bid}, {"$inc": {"otp_attempts": 1}})
+        raise HTTPException(400, f"Incorrect OTP ({4 - b.get('otp_attempts', 0)} attempts left)")
     return view_booking(await _driver_transition(bid, drv["user_id"], ["accepted", "arrived"],
                                                  {"status": "ongoing", "started_at": now_iso()}), drv)
+
+
+@api.post("/driver/bookings/{bid}/release")
+async def driver_release(bid: str, drv: dict = Depends(current_driver)):
+    b = await _driver_transition(bid, drv["user_id"], ["accepted", "arrived"],
+                                 {"status": "searching", "driver_id": None, "driver": None, "otp_attempts": 0,
+                                  "otp": f"{random.randint(0, 9999):04d}", "created_at": now_iso()})
+    await db.bookings.update_one({"id": bid}, {"$push": {"released_by": drv["user_id"]}})
+    return {"id": b["id"], "status": b["status"]}
 
 
 @api.post("/driver/bookings/{bid}/complete")
