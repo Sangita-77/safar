@@ -2,6 +2,7 @@
 All app logic lives in Node.js; this file exists because the preview pod's supervisor runs uvicorn on :8001."""
 
 import asyncio
+import http.cookiejar
 import os
 import subprocess
 from pathlib import Path
@@ -22,12 +23,22 @@ HOP = {"host", "connection", "keep-alive", "content-length", "transfer-encoding"
 app = FastAPI()
 
 
+class _NoCookies(http.cookiejar.CookieJar):
+    """Never keep upstream cookies: the proxy is shared by every visitor."""
+
+    def set_cookie(self, cookie):
+        pass
+
+    def extract_cookies(self, response, request):
+        pass
+
+
 @app.on_event("startup")
 async def start_node():
     subprocess.run(["pkill", "-f", NODE_ENTRY], check=False)
     env = {**os.environ, "PORT": NODE_PORT, "HOST": "127.0.0.1"}
     app.state.node = subprocess.Popen(["node", "--watch", NODE_ENTRY], cwd=NODE_DIR, env=env)
-    app.state.http = httpx.AsyncClient(base_url=f"http://127.0.0.1:{NODE_PORT}", timeout=60)
+    app.state.http = httpx.AsyncClient(base_url=f"http://127.0.0.1:{NODE_PORT}", timeout=60, cookies=httpx.Cookies(_NoCookies()))
 
 
 @app.on_event("shutdown")

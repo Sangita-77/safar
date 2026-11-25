@@ -50,7 +50,7 @@ router.get("/driver/requests", ...currentDriver, async (req, res) => {
   const d = req.member.driver;
   if (!d.online) return res.json([]);
   await expireStale();
-  const rows = await col("bookings").find({ status: "searching", vehicle: d.vehicle_type },
+  const rows = await col("bookings").find({ status: "searching", vehicle: d.vehicle_type, released_by: { $ne: req.member.user_id } },
     { projection: { _id: 0, otp: 0, razorpay_order_id: 0 } }).sort({ created_at: -1 }).limit(50).toArray();
   const loc = d.location;
   if (loc) {
@@ -73,7 +73,7 @@ router.post("/driver/bookings/:bid/accept", ...currentDriver, async (req, res) =
   }
   const info = { name: d.name || m.name || "", phone: d.phone || "", vehicle_model: d.vehicle_model, vehicle_number: d.vehicle_number, rating: d.rating ?? null };
   const b = await col("bookings").findOneAndUpdate(
-    { id: req.params.bid, status: "searching", vehicle: d.vehicle_type },
+    { id: req.params.bid, status: "searching", vehicle: d.vehicle_type, released_by: { $ne: m.user_id } },
     { $set: { status: "accepted", driver_id: m.user_id, driver: info, accepted_at: nowIso(), updated_at: nowIso() } },
     { projection: { _id: 0 }, returnDocument: "after" });
   if (!b) throw new HttpError(409, "This request was taken or cancelled");
