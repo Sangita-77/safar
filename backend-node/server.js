@@ -1,7 +1,7 @@
 import "./src/env.js";
 import express from "express";
 import cors from "cors";
-import { client, ensureIndexes } from "./src/db.js";
+import { client, col, ensureIndexes } from "./src/db.js";
 import { clerkRouter } from "./src/clerk.js";
 import { moveRetiredRoles } from "./src/roles.js";
 import { seedFares } from "./src/fares.js";
@@ -14,10 +14,20 @@ import { router as admin } from "./src/routes/admin.js";
 
 const app = express();
 app.disable("x-powered-by");
+app.set("etag", false);
 app.set("trust proxy", true);
 
 const origins = (process.env.CORS_ORIGINS || "*").split(",").map((o) => o.trim());
 app.use(cors({ origin: origins.includes("*") ? true : origins, credentials: true }));
+
+app.use("/api", (req, res, next) => {
+  delete req.headers["if-none-match"];
+  delete req.headers["if-modified-since"];
+  res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.set("Pragma", "no-cache");
+  res.set("Expires", "0");
+  next();
+});
 
 // Clerk relay needs the raw body, so it is mounted before the JSON parser.
 app.use("/api", clerkRouter);
@@ -37,6 +47,8 @@ const port = Number(process.env.PORT || 8001);
 const host = process.env.HOST || "0.0.0.0";
 
 await client.connect();
+await col("users").deleteMany({ user_id: /^demo_/ });
+await col("drivers").deleteMany({ user_id: /^demo_/ });
 await seedFares();
 await moveRetiredRoles();
 ensureIndexes();

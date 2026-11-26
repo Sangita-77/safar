@@ -37,15 +37,18 @@ function profileFromClerk(cu) {
 export async function currentMember(req, res, next) {
   const { user_id: uid } = await requireUser(req);
   const users = col("users");
-  let member = await users.findOne({ user_id: uid }, { projection: { _id: 0 } });
+  let member = await users.findOne({ user_id: uid }, { projection: { _id: 0, password_hash: 0 } });
   if (!member || !member.role) {
+    if (!secretKey()) {
+      throw new HttpError(401, "Account not found. Please sign in again.");
+    }
     const { profile, isAdmin } = profileFromClerk(await clerkUser(uid));
     const role = isAdmin ? "admin" : DEFAULT_ROLE;
     await users.updateOne({ user_id: uid, role: { $in: [null, ""] } }, { $set: { role } });
     member = await users.findOneAndUpdate(
       { user_id: uid },
       { $setOnInsert: { user_id: uid, role, phone: "", created_at: nowIso(), ...profile } },
-      { upsert: true, projection: { _id: 0 }, returnDocument: "after" },
+      { upsert: true, projection: { _id: 0, password_hash: 0 }, returnDocument: "after" },
     );
   }
   if (member.env !== ENV) await users.updateOne({ user_id: uid }, { $set: { env: ENV } });

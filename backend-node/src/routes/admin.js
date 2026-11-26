@@ -64,7 +64,7 @@ router.get("/admin/bookings", ...admin, async (req, res) => {
 });
 
 router.get("/users", ...admin, async (req, res) => {
-  const people = await col("users").find(IN_ENV, { projection: { _id: 0 } }).sort({ created_at: -1 }).limit(2000).toArray();
+  const people = await col("users").find(IN_ENV, { projection: { _id: 0, password_hash: 0 } }).sort({ created_at: -1 }).limit(2000).toArray();
   res.json({
     roles: ROLES.filter((r) => RANK[r] <= RANK[req.member.role]),
     users: people.map((p) => ({ ...p, role: effectiveRole(p.role) })),
