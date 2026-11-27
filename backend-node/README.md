@@ -12,7 +12,7 @@ node server.js        # or: yarn dev (auto-restart on changes)
 | Name | Purpose |
 |---|---|
 | MONGO_URL, DB_NAME | MongoDB connection |
-| PORT (default 8001), HOST (default 0.0.0.0) | Where the API listens |
+| PORT (default 7200), HOST (default 0.0.0.0) | Where the API listens |
 | CORS_ORIGINS | Allowed frontend origins, comma separated (`*` = all) |
 | CLERK_PUBLISHABLE_KEY, CLERK_SECRET_KEY | Login (Clerk) |
 | ADMIN_EMAIL | Email(s) that become super admin on first sign-in |

@@ -8,7 +8,7 @@ The frontend contains two apps:
 ## Mobile app (Expo)
 
 Set `EXPO_PUBLIC_BACKEND_URL` in `mobile/.env` to the backend origin before
-starting. Use `http://localhost:8001` for web, `http://10.0.2.2:8001` for an
+starting. Use `http://localhost:7200` for web, `http://10.0.2.2:7200` for an
 Android emulator, or your computer's LAN address for a physical device. Enable
 Clerk's Native API for the Clerk application to sign in on mobile.
 

@@ -9,17 +9,17 @@ function resolveBackendUrl() {
 
   if (Platform.OS !== 'web' && lanHost && lanHost !== 'localhost' && lanHost !== '127.0.0.1') {
     if (!raw || raw.includes('localhost') || raw.includes('127.0.0.1')) {
-      return `http://${lanHost}:8001`;
+      return `http://${lanHost}:7200`;
     }
   }
 
   if (raw) return raw;
 
   if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location?.hostname) {
-    return `http://${window.location.hostname}:8001`;
+    return `http://${window.location.hostname}:7200`;
   }
 
-  return 'http://localhost:8001';
+  return 'http://localhost:7200';
 }
 
 export const BACKEND_URL = resolveBackendUrl();
@@ -54,11 +54,11 @@ export const inr = (amount) =>
 export const fmtDate = (iso) =>
   iso
     ? new Date(iso).toLocaleString('en-IN', {
-        day: 'numeric',
-        month: 'short',
-        hour: 'numeric',
-        minute: '2-digit',
-      })
+      day: 'numeric',
+      month: 'short',
+      hour: 'numeric',
+      minute: '2-digit',
+    })
     : '';
 
 export const SERVICES = [

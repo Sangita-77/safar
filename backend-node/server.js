@@ -43,7 +43,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ detail: "Internal Server Error" });
 });
 
-const port = Number(process.env.PORT || 8001);
+const port = Number(process.env.PORT || 7200);
 const host = process.env.HOST || "0.0.0.0";
 
 await client.connect();

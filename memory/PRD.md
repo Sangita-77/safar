@@ -5,7 +5,7 @@
 User choices: open as Link (PWA); users = customer, driver and super admin; Email and Password Login; payments Razorpay + cash on delivery; services: Car rides, Bike rides, E-rickshaw rides, Courier/parcel, Hourly vehicle rental; "do it professionally", "make it compatible with real world and a professional app". Admin email: user said "create demo" (no email given yet). Razorpay keys: skipped.
 
 ## Architecture
-- Backend (2026-11-25 rewrite, same logic): Node.js in /app/backend-node (Express 5, mongodb driver, jose for Clerk JWT, zod validation, razorpay). In preview, /app/backend/server.py only starts Node on 127.0.0.1:8002 and forwards /api (supervisor is fixed to uvicorn on 8001). Emergent publishing does not support Node backends; user will self-host (see backend-node/README.md).
+- Backend (2026-11-25 rewrite, same logic): Node.js in /app/backend-node (Express 5, mongodb driver, jose for Clerk JWT, zod validation, razorpay). In preview, /app/backend/server.py only starts Node on 127.0.0.1:8002 and forwards /api (supervisor is fixed to uvicorn on 7200). Emergent publishing does not support Node backends; user will self-host (see backend-node/README.md).
 - Frontend: React (CRA) mobile-first PWA (manifest, sw.js, icons), Tailwind + shadcn, react-query, Leaflet + OpenStreetMap tiles, Clerk components.
 - Backend: FastAPI (server.py) + MongoDB (motor). Emergent-managed Clerk auth (clerk_auth.py). Roles in db.users (admin/driver/customer), ADMIN_EMAIL for first admin.
 - Geo: Nominatim proxy (/api/geo/search, /api/geo/reverse), distance = haversine × 1.3.
